@@ -1,35 +1,40 @@
 use std::collections::HashMap;
 
 use async_trait::async_trait;
-use inindexer::near_indexer_primitives::CryptoHash;
+use inindexer::near_indexer_primitives::{types::BlockHeight, CryptoHash};
 use inindexer::{
-    neardata_server::NeardataServerProvider, run_indexer, BlockIterator, IndexerOptions,
+    neardata::NeardataProvider, run_indexer, BlockIterator, IndexerOptions,
     PreprocessTransactionsSettings,
 };
-use intear_events::events::transactions::tx_receipt::TxReceiptEventData;
-use intear_events::events::transactions::tx_transaction::TxTransactionEventData;
+use intear_events::events::transactions::{
+    tx_receipt::TxReceiptEvent, tx_transaction::TxTransactionEvent,
+};
 use tx_indexer::{TxEventHandler, TxIndexer};
 
 #[derive(Default)]
 struct TestIndexer {
-    transaction_logs: HashMap<CryptoHash, Vec<TxTransactionEventData>>,
-    receipt_logs: HashMap<CryptoHash, Vec<TxReceiptEventData>>,
+    transaction_logs: HashMap<CryptoHash, Vec<TxTransactionEvent>>,
+    receipt_logs: HashMap<CryptoHash, Vec<TxReceiptEvent>>,
 }
 
 #[async_trait]
 impl TxEventHandler for TestIndexer {
-    async fn handle_transaction(&mut self, event: TxTransactionEventData) {
+    async fn handle_transaction(&mut self, event: TxTransactionEvent) {
         self.transaction_logs
             .entry(event.transaction_id)
             .or_default()
             .push(event);
     }
 
-    async fn handle_receipt(&mut self, event: TxReceiptEventData) {
+    async fn handle_receipt(&mut self, event: TxReceiptEvent) {
         self.receipt_logs
             .entry(event.receipt_id)
             .or_default()
             .push(event);
+    }
+
+    async fn flush_events(&mut self, _block_height: BlockHeight) {
+        // No need to flush in tests
     }
 }
 
@@ -39,7 +44,7 @@ async fn handles_transactions() {
 
     run_indexer(
         &mut indexer,
-        NeardataServerProvider::mainnet(),
+        NeardataProvider::mainnet(),
         IndexerOptions {
             range: BlockIterator::iterator(124099140..=124099142),
             preprocess_transactions: Some(PreprocessTransactionsSettings {
@@ -73,7 +78,7 @@ async fn handles_receipts() {
 
     run_indexer(
         &mut indexer,
-        NeardataServerProvider::mainnet(),
+        NeardataProvider::mainnet(),
         IndexerOptions {
             range: BlockIterator::iterator(124099140..=124099142),
             preprocess_transactions: Some(PreprocessTransactionsSettings {

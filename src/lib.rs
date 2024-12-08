@@ -1,16 +1,21 @@
 pub mod redis_handler;
 
 use async_trait::async_trait;
-use inindexer::near_indexer_primitives::views::ExecutionStatusView;
-use inindexer::near_indexer_primitives::StreamerMessage;
+use inindexer::near_indexer_primitives::{
+    types::BlockHeight, views::ExecutionStatusView, StreamerMessage,
+};
 use inindexer::{CompleteTransaction, IncompleteTransaction, Indexer, TransactionReceipt};
-use intear_events::events::transactions::tx_receipt::TxReceiptEventData;
-use intear_events::events::transactions::tx_transaction::TxTransactionEventData;
+use intear_events::events::transactions::{
+    tx_receipt::TxReceiptEvent, tx_transaction::TxTransactionEvent,
+};
 
 #[async_trait]
 pub trait TxEventHandler: Send + Sync {
-    async fn handle_transaction(&mut self, event: TxTransactionEventData);
-    async fn handle_receipt(&mut self, event: TxReceiptEventData);
+    async fn handle_transaction(&mut self, event: TxTransactionEvent);
+    async fn handle_receipt(&mut self, event: TxReceiptEvent);
+
+    /// Called after each block
+    async fn flush_events(&mut self, block_height: BlockHeight);
 }
 
 pub struct TxIndexer<T: TxEventHandler + Send + Sync + 'static>(pub T);
@@ -25,7 +30,7 @@ impl<T: TxEventHandler + Send + Sync + 'static> Indexer for TxIndexer<T> {
         transaction: &IncompleteTransaction,
         _block: &StreamerMessage,
     ) -> Result<(), Self::Error> {
-        let receipt_event = TxReceiptEventData {
+        let receipt_event = TxReceiptEvent {
             block_timestamp_nanosec: receipt.block_timestamp_nanosec,
             block_height: receipt.block_height,
             receipt_id: receipt.receipt.receipt.receipt_id,
@@ -53,7 +58,7 @@ impl<T: TxEventHandler + Send + Sync + 'static> Indexer for TxIndexer<T> {
         transaction: &CompleteTransaction,
         block: &StreamerMessage,
     ) -> Result<(), Self::Error> {
-        let transaction_event = TxTransactionEventData {
+        let transaction_event = TxTransactionEvent {
             block_timestamp_nanosec: block.block.header.timestamp_nanosec as u128,
             block_height: block.block.header.height,
             transaction_id: transaction.transaction.transaction.hash,
@@ -61,17 +66,15 @@ impl<T: TxEventHandler + Send + Sync + 'static> Indexer for TxIndexer<T> {
             receiver_id: transaction.transaction.transaction.receiver_id.clone(),
             public_key: transaction.transaction.transaction.public_key.to_string(),
             nonce: transaction.transaction.transaction.nonce,
-            actions: transaction
-                .transaction
-                .transaction
-                .actions
-                .iter()
-                .map(|action| serde_json::to_value(action).unwrap())
-                .collect(),
             priority_fee: None,
             signature: transaction.transaction.transaction.signature.to_string(),
         };
         self.0.handle_transaction(transaction_event).await;
+        Ok(())
+    }
+
+    async fn process_block_end(&mut self, block: &StreamerMessage) -> Result<(), Self::Error> {
+        self.0.flush_events(block.block.header.height).await;
         Ok(())
     }
 }

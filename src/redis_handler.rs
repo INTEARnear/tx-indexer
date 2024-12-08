@@ -1,16 +1,16 @@
 use async_trait::async_trait;
 use inevents_redis::RedisEventStream;
-use intear_events::events::transactions::tx_receipt::{TxReceiptEvent, TxReceiptEventData};
-use intear_events::events::transactions::tx_transaction::{
-    TxTransactionEvent, TxTransactionEventData,
+use inindexer::near_indexer_primitives::types::BlockHeight;
+use intear_events::events::transactions::{
+    tx_receipt::TxReceiptEvent, tx_transaction::TxTransactionEvent,
 };
 use redis::aio::ConnectionManager;
 
 use crate::TxEventHandler;
 
 pub struct PushToRedisStream {
-    transaction_stream: RedisEventStream<TxTransactionEventData>,
-    receipt_stream: RedisEventStream<TxReceiptEventData>,
+    transaction_stream: RedisEventStream<TxTransactionEvent>,
+    receipt_stream: RedisEventStream<TxReceiptEvent>,
     max_stream_size: usize,
 }
 
@@ -40,17 +40,22 @@ impl PushToRedisStream {
 
 #[async_trait]
 impl TxEventHandler for PushToRedisStream {
-    async fn handle_transaction(&mut self, event: TxTransactionEventData) {
-        self.transaction_stream
-            .emit_event(event.block_height, event, self.max_stream_size)
-            .await
-            .expect("Failed to emit text event");
+    async fn handle_transaction(&mut self, event: TxTransactionEvent) {
+        self.transaction_stream.add_event(event);
     }
 
-    async fn handle_receipt(&mut self, event: TxReceiptEventData) {
-        self.receipt_stream
-            .emit_event(event.block_height, event, self.max_stream_size)
+    async fn handle_receipt(&mut self, event: TxReceiptEvent) {
+        self.receipt_stream.add_event(event);
+    }
+
+    async fn flush_events(&mut self, block_height: BlockHeight) {
+        self.transaction_stream
+            .flush_events(block_height, self.max_stream_size)
             .await
-            .expect("Failed to emit nep297 event");
+            .expect("Failed to flush transaction stream");
+        self.receipt_stream
+            .flush_events(block_height, self.max_stream_size)
+            .await
+            .expect("Failed to flush receipt stream");
     }
 }
