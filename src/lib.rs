@@ -4,7 +4,8 @@ use async_trait::async_trait;
 use inindexer::near_indexer_primitives::{
     types::BlockHeight, views::ExecutionStatusView, StreamerMessage,
 };
-use inindexer::{CompleteTransaction, IncompleteTransaction, Indexer, TransactionReceipt};
+use inindexer::Indexer;
+use inindexer::{CompleteTransaction, IncompleteTransaction, TransactionReceipt};
 use intear_events::events::transactions::{
     tx_receipt::TxReceiptEvent, tx_transaction::TxTransactionEvent,
 };
@@ -35,6 +36,7 @@ impl<T: TxEventHandler + Send + Sync + 'static> Indexer for TxIndexer<T> {
             block_height: receipt.block_height,
             receipt_id: receipt.receipt.receipt.receipt_id,
             transaction_id: transaction.transaction.transaction.hash,
+            predecessor_id: receipt.receipt.receipt.predecessor_id.clone(),
             executor_id: receipt
                 .receipt
                 .execution_outcome
