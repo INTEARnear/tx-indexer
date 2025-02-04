@@ -15,23 +15,12 @@ pub struct PushToRedisStream {
 }
 
 impl PushToRedisStream {
-    pub async fn new(connection: ConnectionManager, max_stream_size: usize, testnet: bool) -> Self {
+    pub async fn new(connection: ConnectionManager, max_stream_size: usize) -> Self {
         Self {
-            transaction_stream: RedisEventStream::new(
-                connection.clone(),
-                if testnet {
-                    format!("{}_testnet", TxTransactionEvent::ID)
-                } else {
-                    TxTransactionEvent::ID.to_string()
-                },
-            ),
+            transaction_stream: RedisEventStream::new(connection.clone(), TxTransactionEvent::ID),
             receipt_stream: RedisEventStream::new(
                 connection.clone(),
-                if testnet {
-                    format!("{}_testnet", TxReceiptEvent::ID)
-                } else {
-                    TxReceiptEvent::ID.to_string()
-                },
+                TxReceiptEvent::ID.to_string(),
             ),
             max_stream_size,
         }

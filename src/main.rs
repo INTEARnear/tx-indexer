@@ -23,9 +23,7 @@ async fn main() {
     .unwrap();
     let connection = ConnectionManager::new(client).await.unwrap();
 
-    let mut indexer = TxIndexer(
-        PushToRedisStream::new(connection, 10_000, std::env::var("TESTNET").is_ok()).await,
-    );
+    let mut indexer = TxIndexer(PushToRedisStream::new(connection, 10_000).await);
 
     run_indexer(
         &mut indexer,
