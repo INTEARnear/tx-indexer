@@ -1,11 +1,9 @@
 pub mod redis_handler;
 
 use async_trait::async_trait;
-use inindexer::near_indexer_primitives::{
-    types::BlockHeight, views::ExecutionStatusView, StreamerMessage,
-};
-use inindexer::Indexer;
-use inindexer::{CompleteTransaction, IncompleteTransaction, TransactionReceipt};
+use inindexer::near_indexer_primitives::{types::BlockHeight, views::ExecutionStatusView};
+use inindexer::transaction_trees::TransactionTree;
+use inindexer::{Indexer, IndexerExecutionOutcomeWithReceipt, StreamerMessage};
 use intear_events::events::transactions::{
     tx_receipt::TxReceiptEvent, tx_transaction::TxTransactionEvent,
 };
@@ -25,12 +23,15 @@ pub struct TxIndexer<T: TxEventHandler + Send + Sync + 'static>(pub T);
 impl<T: TxEventHandler + Send + Sync + 'static> Indexer for TxIndexer<T> {
     type Error = String;
 
-    async fn on_receipt(
+    async fn process_receipt(
         &mut self,
-        receipt: &TransactionReceipt,
-        transaction: &IncompleteTransaction,
+        receipt: &IndexerExecutionOutcomeWithReceipt,
+        transaction: &TransactionTree,
         _block: &StreamerMessage,
     ) -> Result<(), Self::Error> {
+        let receipt = transaction
+            .receipt(&receipt.receipt.receipt_id)
+            .expect("The tree has the receipts of the block it comes with");
         let receipt_event = TxReceiptEvent {
             block_timestamp_nanosec: receipt.block_timestamp_nanosec,
             block_height: receipt.block_height,
@@ -55,9 +56,9 @@ impl<T: TxEventHandler + Send + Sync + 'static> Indexer for TxIndexer<T> {
         Ok(())
     }
 
-    async fn on_transaction(
+    async fn process_transaction(
         &mut self,
-        transaction: &CompleteTransaction,
+        transaction: &TransactionTree,
         block: &StreamerMessage,
     ) -> Result<(), Self::Error> {
         let transaction_event = TxTransactionEvent {

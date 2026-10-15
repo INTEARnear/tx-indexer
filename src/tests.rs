@@ -2,10 +2,7 @@ use std::collections::HashMap;
 
 use async_trait::async_trait;
 use inindexer::near_indexer_primitives::{types::BlockHeight, CryptoHash};
-use inindexer::{
-    neardata::NeardataProvider, run_indexer, BlockRange, IndexerOptions,
-    PreprocessTransactionsSettings,
-};
+use inindexer::{neardata::NeardataProvider, run_indexer, BlockRange, IndexerOptions};
 use intear_events::events::transactions::{
     tx_receipt::TxReceiptEvent, tx_transaction::TxTransactionEvent,
 };
@@ -46,10 +43,7 @@ async fn handles_transactions() {
         &mut indexer,
         NeardataProvider::mainnet(),
         IndexerOptions {
-            preprocess_transactions: Some(PreprocessTransactionsSettings {
-                prefetch_blocks: 0,
-                postfetch_blocks: 0,
-            }),
+            warm_up_blocks: 50,
             ..IndexerOptions::default_with_range(BlockRange::Range {
                 start_inclusive: 124099140,
                 end_exclusive: Some(124099143),
@@ -82,10 +76,7 @@ async fn handles_receipts() {
         &mut indexer,
         NeardataProvider::mainnet(),
         IndexerOptions {
-            preprocess_transactions: Some(PreprocessTransactionsSettings {
-                prefetch_blocks: 0,
-                postfetch_blocks: 0,
-            }),
+            warm_up_blocks: 50,
             ..IndexerOptions::default_with_range(BlockRange::Range {
                 start_inclusive: 124099140,
                 end_exclusive: Some(124099142),
